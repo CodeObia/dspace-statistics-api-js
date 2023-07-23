@@ -62,21 +62,19 @@ export class SharedService {
 
     async getStatistics(
         items: any,
+        shards: any,
         startDate: string,
         endDate: string,
         aggregate: string,
         solrViewsMainKey: string,
         solrDownloadsMainKey: string,
     ) {
-        // Get statistics shards
-        const shards = await this.getStatisticsShards();
-
         // Define common views query params
         const viewsQueryParams = {
             'facet': 'true',
             'facet.mincount': 1,
             'shards': shards,
-            'rows': 1,
+            'rows': 0,
             'wt': 'json',
             'json.nl': 'map',// return facets as a dict instead of a flat list
             'q': 'type:2',
@@ -146,8 +144,8 @@ export class SharedService {
             }
         }
 
-        const facetPivotViews = [`${solrViewsMainKey}`];
-        const facetPivotDownloads = [`${solrDownloadsMainKey}`];
+        const facetPivotViews = [solrViewsMainKey];
+        const facetPivotDownloads = [solrDownloadsMainKey];
         if (aggregate === 'country') {
             facetPivotViews.push('countryCode')
             facetPivotDownloads.push('countryCode')
@@ -158,10 +156,14 @@ export class SharedService {
         viewsQueryParams['facet.pivot'] = facetPivotViews.join(',');
         downloadsQueryParams['facet.pivot'] = facetPivotDownloads.join(',');
 
-        const views = await this.querySolr(aggregate, periodMonths, viewsQueryParams, facetPivotViews);
-        const downloads = await this.querySolr(aggregate, periodMonths, downloadsQueryParams, facetPivotDownloads);
+        const views = this.querySolr(aggregate, periodMonths, viewsQueryParams, facetPivotViews);
+        const downloads = this.querySolr(aggregate, periodMonths, downloadsQueryParams, facetPivotDownloads);
 
-        return this.mergeStatisticsData(items, views, downloads, aggregate);
+        return await Promise.all([views, downloads])
+            .then((values) => {
+                return this.mergeStatisticsData(items, values[0], values[1], aggregate);
+            });
+
     }
 
     getStatisticsShards(): Promise<any> {
@@ -351,43 +353,58 @@ export class SharedService {
         downloadsMainKey: string,
     ): Promise<any> {
         const rows = [];
-        for (const item of items) {
-            const data: any = await this.getStatistics([item], startDate, endDate, null, viewsMainKey, downloadsMainKey);
-            if (data?.statistics && data.statistics.length > 0) {
-                const statisticsItem = data.statistics[0];
-                if (rows.length === 0) {
-                    let row = [
-                        'UUID',
-                        'Title',
-                        'Handle',
-                        'Total downloads',
-                        'Total views',
-                    ];
-                    if (data?.total_downloads_by_month && typeof data.total_downloads_by_month === 'object' && Object.keys(data.total_downloads_by_month).length > 0) {
-                        row = [...row, ...(`Downloads ${Object.keys(data.total_downloads_by_month).join(',Downloads ')}`).split(',')];
-                    }
-                    if (data?.total_views_by_month && typeof data.total_views_by_month === 'object' && Object.keys(data.total_views_by_month).length > 0) {
-                        row = [...row, ...(`Views ${Object.keys(data.total_views_by_month).join(',Views ')}`).split(',')];
-                    }
-                    rows.push(row.join(','));
-                }
+        // Get statistics shards
+        const shards = await this.getStatisticsShards();
 
-                let row = [
-                    statisticsItem.id,
-                    `"${JSON.parse(JSON.stringify(statisticsItem.title.replace(/"/g, '""')))}"`,
-                    `${process.env.HANDLE_URL}/${statisticsItem.handle}`,
-                    statisticsItem.downloads,
-                    statisticsItem.views,
-                ]
-                if (data?.total_downloads_by_month && typeof data.total_downloads_by_month === 'object' && Object.keys(data.total_downloads_by_month).length > 0) {
-                    row = [...row, ...Object.values(data.total_downloads_by_month)];
-                }
-                if (data?.total_views_by_month && typeof data.total_views_by_month === 'object' && Object.keys(data.total_views_by_month).length > 0) {
-                    row = [...row, ...Object.values(data.total_views_by_month)];
-                }
-                rows.push(row.join(','));
+        let results: any;
+        let promises = [];
+        for (const item of items) {
+            promises.push(this.getStatistics([item], shards, startDate, endDate, null, viewsMainKey, downloadsMainKey));
+
+            if (promises.length === 50) {
+                results = await Promise.all(promises)
+                    .then(async (values) => {
+                        for (const data of values) {
+                            if (data?.statistics && data.statistics.length > 0) {
+                                const statisticsItem = data.statistics[0];
+                                if (rows.length === 0) {
+                                    let row = [
+                                        'UUID',
+                                        'Title',
+                                        'Handle',
+                                        'Total downloads',
+                                        'Total views',
+                                    ];
+                                    if (data?.total_downloads_by_month && typeof data.total_downloads_by_month === 'object' && Object.keys(data.total_downloads_by_month).length > 0) {
+                                        row = [...row, ...(`Downloads ${Object.keys(data.total_downloads_by_month).join(',Downloads ')}`).split(',')];
+                                    }
+                                    if (data?.total_views_by_month && typeof data.total_views_by_month === 'object' && Object.keys(data.total_views_by_month).length > 0) {
+                                        row = [...row, ...(`Views ${Object.keys(data.total_views_by_month).join(',Views ')}`).split(',')];
+                                    }
+                                    rows.push(row.join(','));
+                                }
+
+                                let row = [
+                                    statisticsItem.id,
+                                    `"${JSON.parse(JSON.stringify(statisticsItem.title.replace(/"/g, '""')))}"`,
+                                    `${process.env.HANDLE_URL}/${statisticsItem.handle}`,
+                                    statisticsItem.downloads,
+                                    statisticsItem.views,
+                                ]
+                                if (data?.total_downloads_by_month && typeof data.total_downloads_by_month === 'object' && Object.keys(data.total_downloads_by_month).length > 0) {
+                                    row = [...row, ...Object.values(data.total_downloads_by_month)];
+                                }
+                                if (data?.total_views_by_month && typeof data.total_views_by_month === 'object' && Object.keys(data.total_views_by_month).length > 0) {
+                                    row = [...row, ...Object.values(data.total_views_by_month)];
+                                }
+                                rows.push(row.join(','));
+                            }
+                        }
+                        return rows.join('\n');
+                    });
+                promises = [];
             }
         }
-        return rows.join('\n');
+        return results;
     }
 }

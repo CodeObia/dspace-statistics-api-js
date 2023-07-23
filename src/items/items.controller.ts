@@ -100,7 +100,9 @@ export class ItemsController {
             'Content-Disposition': `attachment; filename="DSpace-Items-statistics-${new Date().toISOString()}.csv"`
         });
         const stream = new Readable();
+        console.time('csvexportAll')
         stream.push(await this.itemService.csvExport(null, startDate, endDate));
+        console.timeEnd('csvexportAll')
         stream.setEncoding('utf8')
         stream.push(null);
         stream.pipe(res);

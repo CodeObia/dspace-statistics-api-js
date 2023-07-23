@@ -22,8 +22,6 @@ export class ItemsService {
         limit = this.sharedService.validateLimitParam(limit);
         page = this.sharedService.validatePageParam(page);
 
-        const items = await this.getItems(uuid, limit, page);
-
         let total_pages = 0;
         if (uuid == null) {
             const totalQuery = this.dataSource
@@ -38,16 +36,24 @@ export class ItemsService {
                 total_pages = Math.ceil(Number(total.count) / limit);
         }
 
-        let data: any = await this.sharedService.getStatistics(items, startDate, endDate, aggregate, process.env.SOLR_VIEWS_KEY_ITEM, process.env.SOLR_DOWNLOADS_KEY_ITEM);
+        // Get items
+        const items = this.getItems(uuid, limit, page);
+        // Get statistics shards
+        const shards = this.sharedService.getStatisticsShards();
 
-        if (uuid == null) {
-            data = Object.assign({
-                current_page: page,
-                limit: limit,
-                total_pages: total_pages,
-            }, data);
-        }
-        return data;
+        return await Promise.all([items, shards])
+            .then(async (values) => {
+                let data: any = await this.sharedService.getStatistics(values[0], values[1], startDate, endDate, aggregate, process.env.SOLR_VIEWS_KEY_ITEM, process.env.SOLR_DOWNLOADS_KEY_ITEM);
+
+                if (uuid == null) {
+                    data = Object.assign({
+                        current_page: page,
+                        limit: limit,
+                        total_pages: total_pages,
+                    }, data);
+                }
+                return data;
+            });
     }
 
     async getItems(
