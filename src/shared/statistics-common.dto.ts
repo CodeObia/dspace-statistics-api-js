@@ -38,9 +38,13 @@ class StatisticsObject {
     countries: CountriesDisaggregation;
     @ApiProperty({type: [CitiesDisaggregation], description: 'Statistics aggregated by city'})
     cities: CitiesDisaggregation;
+    @ApiProperty({type: [MonthsDisaggregation], description: 'Views aggregated by month'})
+    views_by_month: MonthsDisaggregation;
+    @ApiProperty({type: [MonthsDisaggregation], description: 'Downloads aggregated by month'})
+    downloads_by_month: MonthsDisaggregation;
 }
 
-export class SingleResultStatistics {
+export class MultipleResultsStatistics {
     @ApiProperty({description: 'Current page'})
     current_page: number;
     @ApiProperty({description: 'Results per page'})
@@ -49,17 +53,9 @@ export class SingleResultStatistics {
     total_pages: number;
     @ApiProperty({type: [StatisticsObject], description: 'Statistics'})
     statistics: StatisticsObject;
-    @ApiProperty({type: MonthsDisaggregation, description: 'Total number of views aggregated by month'})
-    total_views_by_month: MonthsDisaggregation;
-    @ApiProperty({type: MonthsDisaggregation, description: 'Total number of downloads aggregated by month'})
-    total_downloads_by_month: MonthsDisaggregation;
 }
 
-export class MultipleResultsStatistics {
+export class SingleResultStatistics {
     @ApiProperty({type: StatisticsObject, description: 'Statistics'})
     statistics: StatisticsObject;
-    @ApiProperty({type: MonthsDisaggregation, description: 'Total number of views aggregated by month'})
-    total_views_by_month: MonthsDisaggregation;
-    @ApiProperty({type: MonthsDisaggregation, description: 'Total number of downloads aggregated by month'})
-    total_downloads_by_month: MonthsDisaggregation;
 }

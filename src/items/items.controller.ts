@@ -39,7 +39,7 @@ export class ItemsController {
     @ApiQuery({
         name: 'start_date',
         required: false,
-        description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days), if provided the results will be aggregated by month',
+        description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days)',
     })
     @ApiQuery({
         name: 'end_date',
@@ -48,9 +48,9 @@ export class ItemsController {
     })
     @ApiQuery({
         name: 'aggregate',
-        enum: ['country', 'city'],
+        enum: ['country', 'city', 'month'],
         required: false,
-        description: 'Items statistics disaggregated by country|city',
+        description: 'Items statistics disaggregated by country|city|month<br><ul>Selecting aggregate by month is limited to 12 months:<li>Start and End date are not provided: The last 12 months starting from the current month</li><li>Start date is not provided: The last 12 months starting from the End date</li><li>End date is not provided: The next 12 months starting from the Start date or current month</li><li>Start and End date are provided: If the period is exceeding 12 months it will set the End date to 12 months from the Start date</li><b>NOTE: The start_date and date_date parameters will be modified according to the cases above if the month aggregation is selected</b></ul>',
     })
     @ApiExtraModels(MultipleResultsStatistics)
     @ApiResponse({
@@ -82,26 +82,34 @@ export class ItemsController {
     @ApiQuery({
         name: 'start_date',
         required: false,
-        description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days), if provided the results will be aggregated by month',
+        description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days)',
     })
     @ApiQuery({
         name: 'end_date',
         required: false,
         description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days), if not provided it will default to the current month',
     })
+    @ApiQuery({
+        name: 'aggregate',
+        enum: ['month'],
+        required: false,
+        description: 'Items statistics disaggregated by month<br><ul>Selecting aggregate by month is limited to 12 months:<li>Start and End date are not provided: The last 12 months starting from the current month</li><li>Start date is not provided: The last 12 months starting from the End date</li><li>End date is not provided: The next 12 months starting from the Start date or current month</li><li>Start and End date are provided: If the period is exceeding 12 months it will set the End date to 12 months from the Start date</li><b>NOTE: The start_date and date_date parameters will be modified according to the cases above if the month aggregation is selected</b></ul>',
+    })
     @Get('/csv')
     async csvexportAll(
         @Query('start_date') startDate: string = null,
         @Query('end_date') endDate: string = new Date().toISOString().split('T')[0],
+        @Query('aggregate') aggregate: string,
         @Response() res: any,
     ) {
+        aggregate = aggregate === 'month' ? aggregate : null;
         res.set({
             'Content-Type': 'application/octet-stream; charset=utf8',
             'Content-Disposition': `attachment; filename="DSpace-Items-statistics-${new Date().toISOString()}.csv"`
         });
         const stream = new Readable();
         console.time('csvexportAll')
-        stream.push(await this.itemService.csvExport(null, startDate, endDate));
+        stream.push(await this.itemService.csvExport(null, startDate, endDate, aggregate));
         console.timeEnd('csvexportAll')
         stream.setEncoding('utf8')
         stream.push(null);
@@ -123,7 +131,7 @@ export class ItemsController {
     @ApiQuery({
         name: 'start_date',
         required: false,
-        description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days), if provided the results will be aggregated by month',
+        description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days)',
     })
     @ApiQuery({
         name: 'end_date',
@@ -132,9 +140,9 @@ export class ItemsController {
     })
     @ApiQuery({
         name: 'aggregate',
-        enum: ['country', 'city'],
+        enum: ['country', 'city', 'month'],
         required: false,
-        description: 'Items statistics disaggregated by country|city',
+        description: 'Item statistics disaggregated by country|city|month<br><ul>Selecting aggregate by month is limited to 12 months:<li>Start and End date are not provided: The last 12 months starting from the current month</li><li>Start date is not provided: The last 12 months starting from the End date</li><li>End date is not provided: The next 12 months starting from the Start date or current month</li><li>Start and End date are provided: If the period is exceeding 12 months it will set the End date to 12 months from the Start date</li><b>NOTE: The start_date and date_date parameters will be modified according to the cases above if the month aggregation is selected</b></ul>',
     })
     @ApiExtraModels(SingleResultStatistics)
     @ApiResponse({
@@ -170,26 +178,34 @@ export class ItemsController {
     @ApiQuery({
         name: 'start_date',
         required: false,
-        description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days), if provided the results will be aggregated by month',
+        description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days)',
     })
     @ApiQuery({
         name: 'end_date',
         required: false,
         description: 'Date (ISO 8601) — Start date for statistics tally by months (Ignores days), if not provided it will default to the current month',
     })
+    @ApiQuery({
+        name: 'aggregate',
+        enum: ['month'],
+        required: false,
+        description: 'Item statistics disaggregated by month<br><ul>Selecting aggregate by month is limited to 12 months:<li>Start and End date are not provided: The last 12 months starting from the current month</li><li>Start date is not provided: The last 12 months starting from the End date</li><li>End date is not provided: The next 12 months starting from the Start date or current month</li><li>Start and End date are provided: If the period is exceeding 12 months it will set the End date to 12 months from the Start date</li><b>NOTE: The start_date and date_date parameters will be modified according to the cases above if the month aggregation is selected</b></ul>',
+    })
     @Get(':uuid/csv')
     async csvexport(
         @Param('uuid') uuid: string = null,
         @Query('start_date') startDate: string = null,
         @Query('end_date') endDate: string = new Date().toISOString().split('T')[0],
+        @Query('aggregate') aggregate: string,
         @Response() res: any,
     ) {
+        aggregate = aggregate === 'month' ? aggregate : null;
         res.set({
             'Content-Type': 'application/octet-stream; charset=utf8',
             'Content-Disposition': `attachment; filename="DSpace-Items-statistics-${new Date().toISOString()}.csv"`
         });
         const stream = new Readable();
-        stream.push(await this.itemService.csvExport(uuid, startDate, endDate));
+        stream.push(await this.itemService.csvExport(uuid, startDate, endDate, aggregate));
         stream.setEncoding('utf8')
         stream.push(null);
         stream.pipe(res);

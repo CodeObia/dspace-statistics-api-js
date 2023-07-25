@@ -21,6 +21,7 @@ export class CollectionsService {
         aggregate = this.sharedService.validateAggregationParam(aggregate);
         limit = this.sharedService.validateLimitParam(limit);
         page = this.sharedService.validatePageParam(page);
+        [startDate, endDate] = this.sharedService.validateDateParam(startDate, endDate, aggregate);
 
         let total_pages = 0;
         if (uuid == null) {
@@ -92,8 +93,10 @@ export class CollectionsService {
         uuid: string,
         startDate: string,
         endDate: string,
+        aggregate: string,
     ): Promise<any> {
+        [startDate, endDate] = this.sharedService.validateDateParam(startDate, endDate, aggregate);
         const items = await this.getCollections(uuid, null, null);
-        return await this.sharedService.csvExport(items, startDate, endDate, process.env.SOLR_VIEWS_KEY_COLLECTION, process.env.SOLR_DOWNLOADS_KEY_COLLECTION);
+        return await this.sharedService.csvExport(items, startDate, endDate, aggregate, process.env.SOLR_VIEWS_KEY_COLLECTION, process.env.SOLR_DOWNLOADS_KEY_COLLECTION);
     }
 }

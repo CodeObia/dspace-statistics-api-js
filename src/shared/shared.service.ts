@@ -13,7 +13,7 @@ export class SharedService {
 
     validateAggregationParam(aggregate) {
         // Allow aggregate by country and city only
-        return aggregate === 'country' || aggregate === 'city' ? aggregate : null;
+        return aggregate === 'country' || aggregate === 'city' || aggregate === 'month' ? aggregate : null;
     }
 
     validateLimitParam(limit) {
@@ -28,6 +28,73 @@ export class SharedService {
         // page should be a positive number
         page = Number(page);
         return page >= 1 ? page : 1;
+    }
+
+    validateDateParam(startDate, endDate, aggregate) {
+        // Aggregating by month should allow only a duration of 12 months
+        if (aggregate === 'month') {
+            const today = new Date();
+            // Set date to 15 to prevent timezone differences which could cause the date to shift to the previous/next day
+            today.setDate(15);
+            today.setHours(0);
+            today.setMinutes(0);
+            today.setSeconds(0);
+            if (startDate == null && endDate == null) {
+                const endDateObject = today;
+
+                endDate = `${endDateObject.toISOString().split('T')[0]}`;
+
+                // Set start date to the previous 12 months
+                endDateObject.setMonth(endDateObject.getMonth() - 11);
+                startDate = `${endDateObject.toISOString().split('T')[0]}`;
+            } else if (startDate == null) {
+                const endDateObject = new Date(endDate);
+                endDateObject.setDate(15);
+                endDateObject.setHours(0);
+                endDateObject.setMinutes(0);
+                endDateObject.setSeconds(0);
+
+                endDate = `${endDateObject.toISOString().split('T')[0]}`;
+
+                // Set start date to the previous 12 months
+                endDateObject.setMonth(endDateObject.getMonth() - 11);
+                startDate = `${endDateObject.toISOString().split('T')[0]}`;
+            } else if (endDate == null) {
+                const startDateObject = new Date(startDate);
+                startDateObject.setDate(15);
+                startDateObject.setHours(0);
+                startDateObject.setMinutes(0);
+                startDateObject.setSeconds(0);
+
+                startDate = `${startDateObject.toISOString().split('T')[0]}`;
+
+                // Set end date to the next 12 months or current month (whatever is closer)
+                startDateObject.setMonth(startDateObject.getMonth() + 11);
+                endDate = `${(startDateObject > today ? today : startDateObject).toISOString().split('T')[0]}`;
+            } else {
+                const startDateObject = new Date(startDate);
+                startDateObject.setDate(15);
+                startDateObject.setHours(0);
+                startDateObject.setMinutes(0);
+                startDateObject.setSeconds(0);
+
+                startDate = `${startDateObject.toISOString().split('T')[0]}`;
+
+                const endDateObject = new Date(endDate);
+                endDateObject.setDate(15);
+                endDateObject.setHours(0);
+                endDateObject.setMinutes(0);
+                endDateObject.setSeconds(0);
+
+                // Set end date to the next 12 months or endDate or current month (whatever is closer)
+                startDateObject.setMonth(startDateObject.getMonth() + 11);
+                endDate = `${(endDateObject > startDateObject ? (startDateObject > today ? today : startDateObject) : (endDateObject > today ? today : endDateObject)).toISOString().split('T')[0]}`;
+            }
+        }
+        return [
+            startDate,
+            endDate
+        ]
     }
 
     getTitleMetadataField() {
@@ -127,18 +194,13 @@ export class SharedService {
                 endDateObj.setMonth(endDateObj.getMonth() + 1);
                 // Go back one day
                 endDateObj.setDate(0);
-                // Convert `endDate` to solr date format
-                endDate = `${endDateObj.toISOString().split('T')[0]}T00:00:00Z`;
 
-                periodMonths = this.getMonthsPeriod(startDateObj, endDateObj);
-
-                viewsQueryParams['facet.range'] = downloadsQueryParams['facet.range'] = 'time';
-                viewsQueryParams['facet.range.gap'] = downloadsQueryParams['facet.range.gap'] = '+1MONTH';
-                viewsQueryParams['facet.range.start'] = downloadsQueryParams['facet.range.start'] = startDate;
-                viewsQueryParams['facet.range.end'] = downloadsQueryParams['facet.range.end'] = endDate;
-
-                viewsQueryParams['fq'] += ` AND time:{${startDate} TO ${endDateObj.toISOString().split('T')[0]}T23:59:59Z}`;
-                downloadsQueryParams['fq'] += ` AND time:{${startDate} TO ${endDateObj.toISOString().split('T')[0]}T23:59:59Z}`;
+                if (aggregate === 'month') {
+                    periodMonths = this.getMonthsPeriod(startDateObj, endDateObj);
+                } else {
+                    viewsQueryParams['fq'] += ` AND time:{${startDate} TO ${endDateObj.toISOString().split('T')[0]}T23:59:59Z}`;
+                    downloadsQueryParams['fq'] += ` AND time:{${startDate} TO ${endDateObj.toISOString().split('T')[0]}T23:59:59Z}`;
+                }
             } else {
                 startDate = endDate = null;
             }
@@ -156,14 +218,118 @@ export class SharedService {
         viewsQueryParams['facet.pivot'] = facetPivotViews.join(',');
         downloadsQueryParams['facet.pivot'] = facetPivotDownloads.join(',');
 
-        const views = this.querySolr(aggregate, periodMonths, viewsQueryParams, facetPivotViews);
-        const downloads = this.querySolr(aggregate, periodMonths, downloadsQueryParams, facetPivotDownloads);
+        if (aggregate === 'month') {
+            const viewsQueryParamsFQ = viewsQueryParams['fq'];
+            const downloadsQueryParamsFQ = downloadsQueryParams['fq'];
+            let viewsPromises = [];
+            let downloadsPromises = [];
+            for (const month in periodMonths) {
+                if (periodMonths.hasOwnProperty(month)) {
+                    const startDateObj = new Date(`${month}-01`);
+                    const endDateObj = new Date(`${month}-01`);
+                    // Add a month
+                    endDateObj.setMonth(endDateObj.getMonth() + 1);
+                    // Go back one day
+                    endDateObj.setDate(0);
 
-        return await Promise.all([views, downloads])
-            .then((values) => {
-                return this.mergeStatisticsData(items, values[0], values[1], aggregate);
-            });
+                    viewsQueryParams['fq'] = `${viewsQueryParamsFQ} AND time:{${startDateObj.toISOString().split('T')[0]}T00:00:00Z TO ${endDateObj.toISOString().split('T')[0]}T23:59:59Z}`;
+                    downloadsQueryParams['fq'] = `${downloadsQueryParamsFQ} AND time:{${startDateObj.toISOString().split('T')[0]}T00:00:00Z TO ${endDateObj.toISOString().split('T')[0]}T23:59:59Z}`;
 
+                    viewsPromises.push(this.querySolr(viewsQueryParams, facetPivotViews, month));
+                    downloadsPromises.push(this.querySolr(downloadsQueryParams, facetPivotDownloads, month));
+                }
+            }
+
+            let views = [];
+            let tries = 0;
+            while (viewsPromises.length && tries <= 5) {
+                await Promise.all(viewsPromises)
+                    .then((values) => {
+                        viewsPromises = [];
+                        values.map((value) => {
+                            if (tries > 0) {
+                                console.log(`viewsPromises, try ${tries}`, Object.keys(value));
+                            }
+                            if (value.hasOwnProperty('error')) {
+                                if (value.error?.code === 500) {
+                                    viewsPromises.push(this.querySolr(value.params[0], value.params[1], value.params[2], tries));
+                                }
+                                if (tries === 5) {
+                                    console.log(`failed viewsPromises, ${value.params[2]} => `, value.error);
+                                }
+                            } else {
+                                views.push(value);
+                            }
+                        });
+                    });
+                tries++;
+            }
+            const viewsMerged = this.mergeMonthlyStatistics(views, periodMonths);
+
+            let downloads = [];
+            tries = 0;
+            while (downloadsPromises.length && tries <= 5) {
+                await Promise.all(downloadsPromises)
+                    .then((values) => {
+                        downloadsPromises = [];
+                        values.map((value) => {
+                            if (tries > 0) {
+                                console.log(`downloadsPromises, try ${tries}`, Object.keys(value));
+                            }
+                            if (value.hasOwnProperty('error')) {
+                                if (value.error?.code === 500) {
+                                    downloadsPromises.push(this.querySolr(value.params[0], value.params[1], value.params[2], tries));
+                                }
+                                if (tries === 5) {
+                                    console.log(`downloadsPromises, ${value.params[2]} => `, value.error);
+                                }
+                            } else {
+                                downloads.push(value);
+                            }
+                        });
+                    });
+                tries++;
+            }
+            const downloadsMerged = this.mergeMonthlyStatistics(downloads, periodMonths);
+
+            return this.mergeStatisticsData(items, viewsMerged, downloadsMerged, aggregate, periodMonths);
+        } else {
+            const views = this.querySolr(viewsQueryParams, facetPivotViews, null);
+            const downloads = this.querySolr(downloadsQueryParams, facetPivotDownloads, null);
+
+            return await Promise.all([views, downloads])
+                .then((values) => {
+                    // console.log('values[0] => ', values[0])
+                    if (values[0].hasOwnProperty('error'))
+                        values[0] = [];
+                    if (values[1].hasOwnProperty('error'))
+                        values[1] = [];
+                    return this.mergeStatisticsData(items, values[0], values[1], aggregate, {});
+                });
+        }
+
+    }
+
+    mergeMonthlyStatistics(statisticsArray, periodMonths) {
+        const data = {};
+        for (const statisticsObject of statisticsArray) {
+            const month = Object.keys(statisticsObject)[0];
+            const statistics = statisticsObject[month];
+            for (const statisticItem of statistics) {
+                const total_by_month = JSON.parse(JSON.stringify(periodMonths));
+                if (!data.hasOwnProperty(statisticItem.value)) {
+                    data[statisticItem.value] = {
+                        field: 'id',
+                        value: statisticItem.value,
+                        count: 0,
+                        months: total_by_month,
+                    }
+                }
+                data[statisticItem.value].count += statisticItem.count;
+                data[statisticItem.value].months[month] = statisticItem.count;
+            }
+        }
+        return Object.values(data);
     }
 
     getStatisticsShards(): Promise<any> {
@@ -216,50 +382,57 @@ export class SharedService {
     }
 
     async querySolr(
-        aggregate: string,
-        periodMonths: {},
         queryParams: {},
         facetPivot: string[],
+        month: string,
+        tries: number = 0,
     ): Promise<any> {
+        // if (tries === 0) {
+        //     return {
+        //         error: {
+        //             message: 'trials',
+        //             code: 500,
+        //             tries
+        //         },
+        //         params: [
+        //             queryParams,
+        //             facetPivot,
+        //             month
+        //         ]
+        //     };
+        // }
+        const params = JSON.parse(JSON.stringify([
+            queryParams,
+            facetPivot,
+            month
+        ]));
         return firstValueFrom(this.httpService.get(`${process.env.SOLR_SERVER}/statistics/select`, {
             params: queryParams
         }))
             .then((response) => {
+                // console.log(JSON.stringify(response.data));
                 const result = response?.data?.facet_counts;
-                const data = result?.facet_pivot.hasOwnProperty(facetPivot.join(',')) ? result.facet_pivot[facetPivot.join(',')] : null
-
-                const total_by_month = JSON.parse(JSON.stringify(periodMonths));
-                const byMonth = result?.facet_ranges?.time?.counts;
-                if (typeof byMonth === 'object' && byMonth != null) {
-                    for (const month in byMonth) {
-                        if (byMonth.hasOwnProperty(month)) {
-                            const dateArray = month.split('-');
-                            const dateMonth = dateArray[0] + '-' + dateArray[1];
-                            if (total_by_month.hasOwnProperty(dateMonth)) {
-                                total_by_month[dateMonth] = byMonth[month];
-                            }
-                        }
-                    }
-                }
-
-                return {
-                    data,
-                    total_by_month,
+                if (month != null) {
+                    const data: any = {};
+                    data[month] = result?.facet_pivot.hasOwnProperty(facetPivot.join(',')) ? result.facet_pivot[facetPivot.join(',')] : [];
+                    return data;
+                } else {
+                    return result?.facet_pivot.hasOwnProperty(facetPivot.join(',')) ? result.facet_pivot[facetPivot.join(',')] : [];
                 }
             })
             .catch(e => {
-                console.log('Error getting Solr statistics => ', e.response.data)
+                // console.log('Error getting Solr statistics => ', e?.response?.data)
                 return {
-                    data: [],
-                    total_by_month: []
+                    error: e?.response?.data?.error,
+                    params
                 };
             });
     }
 
-    mergeStatisticsData(items, views, downloads, aggregate) {
+    mergeStatisticsData(items, views, downloads, aggregate, periodMonths) {
         const statistics = items.map((item) => {
             let currentViews = null;
-            views.data = views.data.filter((view) => {
+            views = views.filter((view) => {
                 if (view.value === item.uuid) {
                     currentViews = view;
                 }
@@ -267,7 +440,7 @@ export class SharedService {
             });
 
             let currentDownloads = null;
-            downloads.data = downloads.data.filter((download) => {
+            downloads = downloads.filter((download) => {
                 if (download.value === item.uuid) {
                     currentDownloads = download;
                 }
@@ -276,7 +449,7 @@ export class SharedService {
 
             const countries = {};
             const cities = {};
-            if (aggregate != null) {
+            if (aggregate === 'country' || aggregate === 'city') {
                 if (currentViews != null) {
                     currentViews.pivot.map((pivot) => {
                         if (aggregate === 'country') {
@@ -329,6 +502,8 @@ export class SharedService {
                 downloads: currentDownloads != null ? currentDownloads.count : 0,
                 countries: [],
                 cities: [],
+                views_by_month: currentViews && currentViews.hasOwnProperty('months') ? currentViews.months : JSON.parse(JSON.stringify(periodMonths)),
+                downloads_by_month: currentDownloads && currentDownloads.hasOwnProperty('months') ? currentDownloads.months : JSON.parse(JSON.stringify(periodMonths)),
             };
             if (aggregate === 'country') {
                 data.countries = Object.values(countries);
@@ -340,8 +515,6 @@ export class SharedService {
 
         return {
             statistics,
-            total_views_by_month: views.total_by_month,
-            total_downloads_by_month: downloads.total_by_month,
         };
     }
 
@@ -349,6 +522,7 @@ export class SharedService {
         items: any,
         startDate: string,
         endDate: string,
+        aggregate: string,
         viewsMainKey: string,
         downloadsMainKey: string,
     ): Promise<any> {
@@ -356,17 +530,20 @@ export class SharedService {
         // Get statistics shards
         const shards = await this.getStatisticsShards();
 
-        let results: any;
         let promises = [];
-        for (const item of items) {
-            promises.push(this.getStatistics([item], shards, startDate, endDate, null, viewsMainKey, downloadsMainKey));
 
-            if (promises.length === 50) {
-                results = await Promise.all(promises)
-                    .then(async (values) => {
-                        for (const data of values) {
-                            if (data?.statistics && data.statistics.length > 0) {
-                                const statisticsItem = data.statistics[0];
+        const chunkSize = 100;
+        for (let i = 0; i < items.length; i += chunkSize) {
+            const chunk = items.slice(i, i + chunkSize);
+            console.time(`chunk ${i}`)
+            promises.push(this.getStatistics(chunk, shards, startDate, endDate, aggregate, viewsMainKey, downloadsMainKey));
+            console.log(`chunk ${i} => `, chunk.length)
+
+            await Promise.all(promises)
+                .then(async (values) => {
+                    for (const data of values) {
+                        if (data?.statistics && data.statistics.length > 0) {
+                            for (const statisticsItem of data.statistics) {
                                 if (rows.length === 0) {
                                     let row = [
                                         'UUID',
@@ -375,11 +552,11 @@ export class SharedService {
                                         'Total downloads',
                                         'Total views',
                                     ];
-                                    if (data?.total_downloads_by_month && typeof data.total_downloads_by_month === 'object' && Object.keys(data.total_downloads_by_month).length > 0) {
-                                        row = [...row, ...(`Downloads ${Object.keys(data.total_downloads_by_month).join(',Downloads ')}`).split(',')];
+                                    if (statisticsItem?.downloads_by_month && typeof statisticsItem.downloads_by_month === 'object' && Object.keys(statisticsItem.downloads_by_month).length > 0) {
+                                        row = [...row, ...(`Downloads ${Object.keys(statisticsItem.downloads_by_month).join(',Downloads ')}`).split(',')];
                                     }
-                                    if (data?.total_views_by_month && typeof data.total_views_by_month === 'object' && Object.keys(data.total_views_by_month).length > 0) {
-                                        row = [...row, ...(`Views ${Object.keys(data.total_views_by_month).join(',Views ')}`).split(',')];
+                                    if (statisticsItem?.views_by_month && typeof statisticsItem.views_by_month === 'object' && Object.keys(statisticsItem.views_by_month).length > 0) {
+                                        row = [...row, ...(`Views ${Object.keys(statisticsItem.views_by_month).join(',Views ')}`).split(',')];
                                     }
                                     rows.push(row.join(','));
                                 }
@@ -391,20 +568,21 @@ export class SharedService {
                                     statisticsItem.downloads,
                                     statisticsItem.views,
                                 ]
-                                if (data?.total_downloads_by_month && typeof data.total_downloads_by_month === 'object' && Object.keys(data.total_downloads_by_month).length > 0) {
-                                    row = [...row, ...Object.values(data.total_downloads_by_month)];
+                                if (statisticsItem?.downloads_by_month && typeof statisticsItem.downloads_by_month === 'object' && Object.keys(statisticsItem.downloads_by_month).length > 0) {
+                                    row = [...row, ...Object.values(statisticsItem.downloads_by_month)];
                                 }
-                                if (data?.total_views_by_month && typeof data.total_views_by_month === 'object' && Object.keys(data.total_views_by_month).length > 0) {
-                                    row = [...row, ...Object.values(data.total_views_by_month)];
+                                if (statisticsItem?.views_by_month && typeof statisticsItem.views_by_month === 'object' && Object.keys(statisticsItem.views_by_month).length > 0) {
+                                    row = [...row, ...Object.values(statisticsItem.views_by_month)];
                                 }
                                 rows.push(row.join(','));
                             }
                         }
-                        return rows.join('\n');
-                    });
-                promises = [];
-            }
+                    }
+                })
+                .catch(e => console.log(e));
+            console.timeEnd(`chunk ${i}`)
+            promises = [];
         }
-        return results;
+        return rows.join('\n');
     }
 }
