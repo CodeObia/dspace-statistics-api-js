@@ -11,27 +11,35 @@ export class SharedService {
     ) {
     }
 
-    validateAggregationParam(aggregate) {
-        // Allow aggregate by country and city only
+    /**
+     * Allow aggregate by country, city and month only
+     */
+    validateAggregationParam(aggregate: string) {
         return aggregate === 'country' || aggregate === 'city' || aggregate === 'month' ? aggregate : null;
     }
 
-    validateLimitParam(limit) {
-        // limit should be between 1 and 100
+    /**
+     * limit should be between 1 and 100
+     */
+    validateLimitParam(limit: number) {
         limit = Math.abs(limit);
         limit = isNaN(limit) ? 0 : limit;
         limit = limit > 100 ? 100 : limit;
         return limit > 0 ? limit : 100;
     }
 
-    validatePageParam(page) {
-        // page should be a positive number
+    /**
+     * page should be a positive number
+     */
+    validatePageParam(page: number) {
         page = Number(page);
         return page >= 1 ? page : 1;
     }
 
-    validateDateParam(startDate, endDate, aggregate) {
-        // Aggregating by month should allow only a duration of 12 months
+    /**
+     * Aggregating by month should allow only a duration of 12 months
+     */
+    validateDateParam(startDate: string, endDate: string, aggregate: string) {
         if (aggregate === 'month') {
             const today = new Date();
             // Set date to 15 to prevent timezone differences which could cause the date to shift to the previous/next day
@@ -97,6 +105,10 @@ export class SharedService {
         ]
     }
 
+    /**
+     * Get items title metadata field ID
+     * @return string
+     */
     getTitleMetadataField() {
         let titleMetadataFieldArray = process.env.DSPACE_TITLE_METADATA_FIELD.split('.');
 
@@ -127,6 +139,9 @@ export class SharedService {
         return query.getRawOne();
     }
 
+    /**
+     * Get DSpace statistics
+     */
     async getStatistics(
         items: any,
         shards: any,
@@ -137,10 +152,9 @@ export class SharedService {
         solrDownloadsMainKey: string,
     ) {
         // Define common views query params
-        const viewsQueryParams = {
+        const viewsQueryParams: any = {
             'facet': 'true',
             'facet.mincount': 1,
-            'shards': shards,
             'rows': 0,
             'wt': 'json',
             'json.nl': 'map',// return facets as a dict instead of a flat list
@@ -148,7 +162,7 @@ export class SharedService {
             'fq': 'isBot:false AND statistics_type:view'
         }
         // Define common downloads query params
-        const downloadsQueryParams = {
+        const downloadsQueryParams: any = {
             'facet': 'true',
             'facet.mincount': 1,
             'shards': shards,
@@ -157,6 +171,10 @@ export class SharedService {
             'json.nl': 'map',// return facets as a dict instead of a flat list
             'q': 'type:0',
             'fq': 'isBot:false AND statistics_type:view AND bundleName:ORIGINAL'
+        }
+        if (shards !== '') {
+            viewsQueryParams.shards = shards;
+            downloadsQueryParams.shards = shards;
         }
 
         const itemsIds = [];
@@ -310,7 +328,10 @@ export class SharedService {
 
     }
 
-    mergeMonthlyStatistics(statisticsArray, periodMonths) {
+    /**
+     * Merge monthly statistics into one array
+     */
+    mergeMonthlyStatistics(statisticsArray: any, periodMonths: {}) {
         const data = {};
         for (const statisticsObject of statisticsArray) {
             const month = Object.keys(statisticsObject)[0];
@@ -332,16 +353,20 @@ export class SharedService {
         return Object.values(data);
     }
 
+    /**
+     * Enumerate the cores in Solr to determine if statistics have been sharded into
+     * yearly shards by DSpace's stats-util or not (for example: statistics-2018).
+     *
+     * Return the string of shards, which may actually be empty. Solr doesn't
+     * seem to mind if the shards query parameter is empty and I haven't seen
+     * any negative performance impact so this should be fine.
+     *
+     * In DSpace7 Solr shards are not supported
+     */
     getStatisticsShards(): Promise<any> {
-        /*
-         * Enumerate the cores in Solr to determine if statistics have been sharded into
-         * yearly shards by DSpace's stats-util or not (for example: statistics-2018).
-         *
-         * Return the string of shards, which may actually be empty. Solr doesn't
-         * seem to mind if the shards query parameter is empty and I haven't seen
-         * any negative performance impact so this should be fine.
-         */
-
+        if (Number(process.env.DSPACE_VERSION) === 7) {
+            return new Promise(resolve => resolve(''));
+        }
         // Solr status to check active cores
         return firstValueFrom(this.httpService.get(`${process.env.SOLR_SERVER}/admin/cores?action=STATUS&wt=json`))
             .then((response) => {
@@ -368,7 +393,10 @@ export class SharedService {
             });
     }
 
-    getMonthsPeriod(startDateObj, endDateObj) {
+    /**
+     * Get date as YYYY-MM between two dates
+     */
+    getMonthsPeriod(startDateObj: Date, endDateObj: Date) {
         let monthsCount = endDateObj.getMonth() - startDateObj.getMonth() + (12 * (endDateObj.getFullYear() - startDateObj.getFullYear()));
         const periodMonths = {};
         while (monthsCount >= 0) {
@@ -381,26 +409,15 @@ export class SharedService {
         return periodMonths;
     }
 
+    /**
+     * Get statistics from Solr
+     */
     async querySolr(
         queryParams: {},
         facetPivot: string[],
         month: string,
         tries: number = 0,
     ): Promise<any> {
-        // if (tries === 0) {
-        //     return {
-        //         error: {
-        //             message: 'trials',
-        //             code: 500,
-        //             tries
-        //         },
-        //         params: [
-        //             queryParams,
-        //             facetPivot,
-        //             month
-        //         ]
-        //     };
-        // }
         const params = JSON.parse(JSON.stringify([
             queryParams,
             facetPivot,
@@ -410,7 +427,6 @@ export class SharedService {
             params: queryParams
         }))
             .then((response) => {
-                // console.log(JSON.stringify(response.data));
                 const result = response?.data?.facet_counts;
                 if (month != null) {
                     const data: any = {};
@@ -421,7 +437,7 @@ export class SharedService {
                 }
             })
             .catch(e => {
-                // console.log('Error getting Solr statistics => ', e?.response?.data)
+                console.log('Error getting Solr statistics => ', e?.response?.data)
                 return {
                     error: e?.response?.data?.error,
                     params
@@ -429,7 +445,16 @@ export class SharedService {
             });
     }
 
-    mergeStatisticsData(items, views, downloads, aggregate, periodMonths) {
+    /**
+     * Combine items and statistics
+     */
+    mergeStatisticsData(
+        items: any,
+        views: any,
+        downloads: any,
+        aggregate: string,
+        periodMonths: {},
+    ) {
         const statistics = items.map((item) => {
             let currentViews = null;
             views = views.filter((view) => {
@@ -518,6 +543,9 @@ export class SharedService {
         };
     }
 
+    /**
+     * Export statistics into CSV
+     */
     async csvExport(
         items: any,
         startDate: string,
