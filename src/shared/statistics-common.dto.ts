@@ -11,7 +11,7 @@ class CountriesDisaggregation {
 
 class CitiesDisaggregation {
     @ApiProperty({description: 'City name', default: 'City name'})
-    country_iso: string;
+    city_name: string;
     @ApiProperty({description: 'Total number of views'})
     views: number;
     @ApiProperty({description: 'Total number of downloads'})
@@ -19,8 +19,12 @@ class CitiesDisaggregation {
 }
 
 class MonthsDisaggregation {
-    @ApiProperty({description: 'Year-month'})
-    'Year-Month': number;
+    @ApiProperty({description: 'Month', default: 'YYYY-MM'})
+    month: string;
+    @ApiProperty({description: 'Total number of views'})
+    views: number;
+    @ApiProperty({description: 'Total number of downloads'})
+    downloads: number;
 }
 
 class StatisticsObject {
@@ -35,13 +39,11 @@ class StatisticsObject {
     @ApiProperty({description: 'Total number of downloads'})
     downloads: number;
     @ApiProperty({type: [CountriesDisaggregation], description: 'Statistics aggregated by country'})
-    countries: CountriesDisaggregation;
+    country: CountriesDisaggregation;
     @ApiProperty({type: [CitiesDisaggregation], description: 'Statistics aggregated by city'})
-    cities: CitiesDisaggregation;
-    @ApiProperty({type: [MonthsDisaggregation], description: 'Views aggregated by month'})
-    views_by_month: MonthsDisaggregation;
-    @ApiProperty({type: [MonthsDisaggregation], description: 'Downloads aggregated by month'})
-    downloads_by_month: MonthsDisaggregation;
+    city: CitiesDisaggregation;
+    @ApiProperty({type: [MonthsDisaggregation], description: 'Statistics aggregated by month'})
+    month: MonthsDisaggregation;
 }
 
 export class MultipleResultsStatistics {

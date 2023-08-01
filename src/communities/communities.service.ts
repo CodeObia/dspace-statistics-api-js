@@ -37,23 +37,18 @@ export class CommunitiesService {
         }
 
         // Get communities
-        const communities = this.getCommunities(uuid, limit, page);
-        // Get statistics shards
-        const shards = this.sharedService.getStatisticsShards();
+        const communities = await this.getCommunities(uuid, limit, page);
+        let data: any = await this.sharedService.getStatistics(communities, startDate, endDate, aggregate, process.env.SOLR_VIEWS_KEY_COMMUNITY, process.env.SOLR_DOWNLOADS_KEY_COMMUNITY);
+        delete (data.periodMonths);
 
-        return await Promise.all([communities, shards])
-            .then(async (values) => {
-                let data: any = await this.sharedService.getStatistics(values[0], values[1], startDate, endDate, aggregate, process.env.SOLR_VIEWS_KEY_COMMUNITY, process.env.SOLR_DOWNLOADS_KEY_COMMUNITY);
-
-                if (uuid == null) {
-                    data = Object.assign({
-                        current_page: page,
-                        limit: limit,
-                        total_pages: total_pages,
-                    }, data);
-                }
-                return data;
-            });
+        if (uuid == null) {
+            data = Object.assign({
+                current_page: page,
+                limit: limit,
+                total_pages: total_pages,
+            }, data);
+        }
+        return data;
     }
 
     async getCommunities(
