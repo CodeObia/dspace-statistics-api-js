@@ -379,8 +379,6 @@ export class SharedService {
             const countries = {};
             const cities = {};
             const months = {};
-            let viewsMonths = {};
-            let downloadsMonths = {};
             if (aggregate === 'country' || aggregate === 'city' || aggregate === 'month') {
                 if (currentViews != null && currentViews.hasOwnProperty(aggregate) && currentViews[aggregate]?.buckets) {
                     if (aggregate === 'month') {
@@ -454,6 +452,7 @@ export class SharedService {
                 }
             }
             const data: any = {
+                item_id: item.uuid,
                 uuid: item.uuid,
                 id: item.uuid,
                 handle: item.handle,
