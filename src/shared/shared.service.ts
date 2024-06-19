@@ -519,6 +519,7 @@ export class SharedService {
                 }
             }
             const data: any = {
+                item_id: item.uuid,
                 uuid: item.uuid,
                 id: item.uuid,
                 handle: item.handle,
