@@ -176,11 +176,13 @@ export class SharedService {
         viewsQueryParams.facet.id = {
             type: 'terms',
             mincount: 1,
+            limit: 1000,
             field: solrViewsMainKey,
         };
         downloadsQueryParams.facet.id = {
             type: 'terms',
             mincount: 1,
+            limit: 1000,
             field: solrDownloadsMainKey,
         };
         const facetPivotViews = ['id'];
@@ -191,6 +193,7 @@ export class SharedService {
                 country: {
                     type: 'terms',
                     mincount: 1,
+                    limit: 1000,
                     field: 'countryCode',
                 }
             };
@@ -200,6 +203,7 @@ export class SharedService {
                 country: {
                     type: 'terms',
                     mincount: 1,
+                    limit: 1000,
                     field: 'countryCode',
                 }
             };
@@ -209,6 +213,7 @@ export class SharedService {
                 city: {
                     type: 'terms',
                     mincount: 1,
+                    limit: 1000,
                     field: 'city',
                 }
             };
@@ -218,6 +223,7 @@ export class SharedService {
                 city: {
                     type: 'terms',
                     mincount: 1,
+                    limit: 1000,
                     field: 'city',
                 }
             };
