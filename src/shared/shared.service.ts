@@ -181,7 +181,7 @@ export class SharedService {
     };
 
     const itemsIds = [];
-    items.map((item) => {
+    items.map((item: any) => {
       itemsIds.push(item.uuid);
     });
     viewsQueryParams.filter.push(
@@ -372,10 +372,9 @@ export class SharedService {
    * Get statistics from Solr
    */
   async querySolr(
-    queryParams: {},
+    queryParams = {},
     facetPivot: string[],
     month: string,
-    tries = 0,
   ): Promise<any> {
     const params = JSON.parse(JSON.stringify([queryParams, facetPivot, month]));
     return firstValueFrom(
@@ -411,9 +410,9 @@ export class SharedService {
     aggregate: string,
     periodMonths: string[],
   ) {
-    const statistics = items.map((item) => {
+    const statistics = items.map((item: any) => {
       let currentViews = null;
-      views = views.filter((view) => {
+      views = views.filter((view: any) => {
         if (view.val === item.uuid) {
           currentViews = view;
         }
@@ -421,7 +420,7 @@ export class SharedService {
       });
 
       let currentDownloads = null;
-      downloads = downloads.filter((download) => {
+      downloads = downloads.filter((download: any) => {
         if (download.val === item.uuid) {
           currentDownloads = download;
         }
@@ -442,7 +441,7 @@ export class SharedService {
           currentViews[aggregate]?.buckets
         ) {
           if (aggregate === 'month') {
-            currentViews[aggregate].buckets.map((bucket) => {
+            currentViews[aggregate].buckets.map((bucket: any) => {
               const monthDateArray = bucket.val.split('-');
               const month = `${monthDateArray[0]}-${monthDateArray[1]}`;
               months[month] = {
@@ -452,7 +451,7 @@ export class SharedService {
               };
             });
           } else if (aggregate === 'country') {
-            currentViews[aggregate].buckets.map((bucket) => {
+            currentViews[aggregate].buckets.map((bucket: any) => {
               countries[bucket.val] = {
                 country_iso: bucket.val,
                 views: bucket.count,
@@ -460,7 +459,7 @@ export class SharedService {
               };
             });
           } else if (aggregate === 'city') {
-            currentViews[aggregate].buckets.map((bucket) => {
+            currentViews[aggregate].buckets.map((bucket: any) => {
               cities[bucket.val] = {
                 city_name: bucket.val,
                 views: bucket.count,
@@ -475,7 +474,7 @@ export class SharedService {
           currentDownloads[aggregate]?.buckets
         ) {
           if (aggregate === 'month') {
-            currentDownloads[aggregate].buckets.map((bucket) => {
+            currentDownloads[aggregate].buckets.map((bucket: any) => {
               const monthDateArray = bucket.val.split('-');
               const month = `${monthDateArray[0]}-${monthDateArray[1]}`;
               if (!months.hasOwnProperty(month)) {
@@ -489,7 +488,7 @@ export class SharedService {
               }
             });
           } else if (aggregate === 'country') {
-            currentDownloads[aggregate].buckets.map((bucket) => {
+            currentDownloads[aggregate].buckets.map((bucket: any) => {
               if (!countries.hasOwnProperty(bucket.val)) {
                 countries[bucket.val] = {
                   country_iso: bucket.val,
@@ -501,7 +500,7 @@ export class SharedService {
               }
             });
           } else if (aggregate === 'city') {
-            currentDownloads[aggregate].buckets.map((bucket) => {
+            currentDownloads[aggregate].buckets.map((bucket: any) => {
               if (!cities.hasOwnProperty(bucket.val)) {
                 cities[bucket.val] = {
                   city_name: bucket.val,
@@ -556,7 +555,6 @@ export class SharedService {
   ): Promise<any> {
     const rows = [];
     let aggregateMonths = false;
-    let promises = [];
 
     const chunkSize = 100;
     for (let i = 0; i < items.length; i += chunkSize) {
@@ -609,12 +607,12 @@ export class SharedService {
               Array.isArray(statisticsItem.month) &&
               statisticsItem.month.length > 0
             ) {
-              statisticsItem.month.map((month) => {
+              statisticsItem.month.map((month: any) => {
                 monthlyDownloads.push(month.downloads);
                 monthlyViews.push(month.views);
               });
             } else {
-              data.periodMonths.map((month) => {
+              data.periodMonths.map(() => {
                 monthlyDownloads.push(0);
                 monthlyViews.push(0);
               });
@@ -626,7 +624,6 @@ export class SharedService {
         }
       }
       console.timeEnd(`chunk ${i}`);
-      promises = [];
     }
     return rows.join('\n');
   }
