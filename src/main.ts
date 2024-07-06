@@ -4,7 +4,7 @@ import { AppModule } from './app.module';
 
 async function bootstrap() {
   const app = await NestFactory.create(AppModule);
-  app.setGlobalPrefix('/rest/statistics_v2');
+  app.setGlobalPrefix('/rest/statistics/v2');
   const config = new DocumentBuilder()
     .setTitle('DSpace statistics API')
     .setVersion('2.0.0')
