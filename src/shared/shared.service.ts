@@ -180,18 +180,20 @@ export class SharedService {
       filter: ['-isBot:true', 'statistics_type:view', 'bundleName:ORIGINAL'],
     };
 
-    const itemsIds = [];
-    items.map((item: any) => {
-      itemsIds.push(item.uuid);
-    });
-    viewsQueryParams.filter.push(
-      `(${solrViewsMainKey}:${itemsIds.join(` OR ${solrViewsMainKey}: `)})`,
-    );
-    downloadsQueryParams.filter.push(
-      `(${solrDownloadsMainKey}:${itemsIds.join(
-        ` OR ${solrDownloadsMainKey}: `,
-      )})`,
-    );
+    if (items) {
+      const itemsIds = [];
+      items.map((item: any) => {
+        itemsIds.push(item.uuid);
+      });
+      viewsQueryParams.filter.push(
+        `(${solrViewsMainKey}:${itemsIds.join(` OR ${solrViewsMainKey}: `)})`,
+      );
+      downloadsQueryParams.filter.push(
+        `(${solrDownloadsMainKey}:${itemsIds.join(
+          ` OR ${solrDownloadsMainKey}: `,
+        )})`,
+      );
+    }
 
     viewsQueryParams.facet = {};
     downloadsQueryParams.facet = {};
@@ -410,6 +412,17 @@ export class SharedService {
     aggregate: string,
     periodMonths: string[],
   ) {
+    // When getting statistics for the repository, add a fake item to map statistics
+    if (!items) {
+      items = [
+        {
+          uuid: 'view',
+          handle: null,
+          title: 'Repository',
+        },
+      ];
+    }
+
     const statistics = items.map((item: any) => {
       let currentViews = null;
       views = views.filter((view: any) => {
@@ -553,6 +566,17 @@ export class SharedService {
     viewsMainKey: string,
     downloadsMainKey: string,
   ): Promise<any> {
+    // When getting statistics for the repository, add a fake item to map statistics
+    if (!items) {
+      items = [
+        {
+          uuid: 'view',
+          handle: null,
+          title: 'Repository',
+        },
+      ];
+    }
+
     const rows = [];
     let aggregateMonths = false;
 

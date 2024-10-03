@@ -8,6 +8,7 @@ import { AuthModule } from './auth/auth.module';
 import { CollectionsModule } from './collections/collections.module';
 import { SharedModule } from './shared/shared.module';
 import { CommunitiesModule } from './communities/communities.module';
+import { RepositoryModule } from './repository/repository.module';
 import { StatsModule } from './stats/stats.module';
 
 @Module({
@@ -27,6 +28,7 @@ import { StatsModule } from './stats/stats.module';
     CollectionsModule,
     SharedModule,
     CommunitiesModule,
+    RepositoryModule,
     StatsModule,
   ],
   controllers: [AppController],
